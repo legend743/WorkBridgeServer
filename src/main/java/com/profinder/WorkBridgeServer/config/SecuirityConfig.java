@@ -1,6 +1,7 @@
 package com.profinder.WorkBridgeServer.config;
 import com.profinder.WorkBridgeServer.filter.JwtAuthFilter;
-import com.profinder.WorkBridgeServer.service.UserInfoService;
+import com.profinder.WorkBridgeServer.repository.UserInfoRepository;
+//import com.profinder.WorkBridgeServer.service.UserInfoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -26,21 +28,30 @@ public class SecuirityConfig {
 
     @Autowired
     private JwtAuthFilter authFilter;
+    @Autowired
+    UserInfoRepository userInfoRepository;
 
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return new UserInfoService(); // Ensure UserInfoService implements UserDetailsService
-    }
+
+//    @Bean
+//    public UserDetailsService userDetailsService() {
+//        return new UserInfoService(); // Ensure UserInfoService implements UserDetailsService
+//    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable()) // Disable CSRF for stateless APIs
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/welcome", "/auth/addNewUser", "/auth/generateToken").permitAll()
+                        .requestMatchers("/auth/welcome",
+                                "/api/v1/auth/**",
+                                "/auth/addNewUser",
+                                "/auth/generateToken",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**").permitAll()
                         .requestMatchers("/auth/user/**").hasAuthority("ROLE_USER")
                         .requestMatchers("/auth/admin/**").hasAuthority("ROLE_ADMIN")
-                        .anyRequest().authenticated() // Protect all other endpoints
+                        .anyRequest().authenticated()   // Protect all other endpoints
                 )
                 .sessionManagement(sess -> sess
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // No sessions
@@ -67,5 +78,14 @@ public class SecuirityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService(){
+        return username ->
+                userInfoRepository.findByEmail(username).
+                        orElseThrow(
+                                ()->new UsernameNotFoundException("User name not found"));
+
     }
 }
